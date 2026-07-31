@@ -119,6 +119,51 @@ th .inc{display:block;font-style:normal;font-size:9px;color:var(--faint);letter-
 .err{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--loss);padding:20px;border-radius:3px;margin:40px 0;font-size:14px;line-height:1.7}
 .err code{font-family:var(--mono);font-size:12.5px;background:#F1F3F7;padding:2px 5px;border-radius:2px}
 footer{border-top:1px solid var(--rule);margin-top:46px;padding:24px 0 44px;color:var(--faint);font-family:var(--mono);font-size:11px;line-height:1.8}
+.recon{font-family:var(--mono);font-size:11px;color:var(--muted);margin:14px 0 0;letter-spacing:.02em}
+tr.tot td{border-top:2px solid var(--rule);border-bottom:0;font-weight:600;background:#F7F8FA}
+.barcell{width:130px;text-align:left!important}
+.bar{display:inline-block;height:8px;border-radius:1px;vertical-align:middle;opacity:.6;min-width:1px}
+#ddTable td:nth-child(2){width:120px}
+
+.ybar{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding-right:4px}
+.yv{font-weight:600;min-width:52px;text-align:right}
+.ytrack{display:inline-block;width:64px;height:8px;background:var(--soft);border-radius:1px;overflow:hidden}
+.ytrack i{display:block;height:100%;border-radius:1px;opacity:.75}
+#heat td.ycell{text-align:right;padding-right:2px}
+
+#ribbon td.rc{width:60px;height:31px}
+.cb.on{display:flex;flex-direction:column;justify-content:center;align-items:center;line-height:1.15;cursor:default}
+.cb.on em{font-style:normal;font-size:10px;font-weight:600;color:var(--ink)}
+.cb.on i{font-style:normal;font-size:8.5px;color:rgba(13,21,38,.55)}
+#ribbon td.tl{font-size:11.5px;font-weight:600}
+
+.bnav{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--soft);margin-bottom:16px}
+.bnav .chip{padding:7px 12px;font-size:12px}
+.bnav .chip[disabled]{opacity:.35;cursor:default}
+.btitle{display:flex;flex-direction:column;min-width:190px}
+.btitle b{font-family:var(--disp);font-size:19px;letter-spacing:-.02em}
+.btitle span{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.bsum{display:flex;flex-direction:column;gap:3px;margin-left:6px}
+.bsum span{font-family:var(--mono);font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.bsum b{font-family:var(--mono);font-size:15px;font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+@media(max-width:900px){.tiles{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:520px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{position:relative;border-radius:3px;padding:13px 8px 11px;text-align:center;
+ display:flex;flex-direction:column;gap:3px;border:1px solid rgba(13,21,38,.07)}
+.tile b{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.02em}
+.tile u{text-decoration:none;font-family:var(--mono);font-size:14px;font-weight:600}
+.tile s{text-decoration:none;font-family:var(--mono);font-size:10.5px;color:rgba(13,21,38,.6)}
+.badge{position:absolute;top:-6px;right:-4px;font-style:normal;font-family:var(--mono);font-size:8.5px;
+ letter-spacing:.08em;text-transform:uppercase;background:var(--accent);color:#fff;padding:2px 5px;border-radius:2px}
+.bchg{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;font-family:var(--mono);font-size:11.5px}
+.bchg .gone{color:var(--loss)}
+.bchg .came{color:var(--gain)}
+.qstrip{display:flex;gap:2px;margin-top:18px;padding-top:16px;border-top:1px solid var(--soft)}
+.qstrip i{flex:1;height:16px;border-radius:1px;cursor:pointer;opacity:.55;transition:.12s;
+ border:1px solid transparent}
+.qstrip i:hover{opacity:1}
+.qstrip i.on{opacity:1;border-color:var(--ink)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -189,8 +234,17 @@ footer{border-top:1px solid var(--rule);margin-top:46px;padding:24px 0 44px;colo
   <div class="card scroll"><table id="mtable"></table></div>
 </section>
 
+<section>
+  <div class="shead"><span class="snum">03</span><h2>Every fall, and how long it took to come back</h2></div>
+  <p class="sdek">Each episode where the portfolio dropped more than 3% from a high, ordered by depth. "Fall" is peak to trough; "recovery" is trough back to the old high.</p>
+  <div class="card">
+    <div class="scroll"><table id="ddTable"></table></div>
+    <div class="dstats" id="ddStats"></div>
+  </div>
+</section>
+
 <section id="divWrap">
-  <div class="shead"><span class="snum">03</span><h2>Dividends</h2></div>
+  <div class="shead"><span class="snum">04</span><h2>Dividends</h2></div>
   <p class="sdek">Income earned by the book while it was open, scaled to whatever you entered above. <span id="divBasisTxt"></span></p>
   <div class="card">
     <svg class="chart" id="divChart" viewBox="0 0 1000 240" role="img" aria-label="Dividend income by quarter"></svg>
@@ -199,14 +253,23 @@ footer{border-top:1px solid var(--rule);margin-top:46px;padding:24px 0 44px;colo
 </section>
 
 <section>
-  <div class="shead"><span class="snum">04</span><h2>Month by month</h2></div>
+  <div class="shead"><span class="snum">05</span><h2>Month by month</h2></div>
   <p class="sdek">Time-weighted return per calendar month, so contributions don't distort the shading. The year column compounds the months shown.</p>
   <div class="card scroll"><table id="heat"></table></div>
 </section>
 
 <section>
-  <div class="shead"><span class="snum">05</span><h2>The selection record</h2></div>
-  <p class="sdek">One row per name ever held, ordered by cumulative contribution. A filled cell means the name was in the book that quarter; the shade is what the position returned. Hatched cells are quarters spent out.</p>
+  <div class="shead"><span class="snum">06</span><h2>Who paid for the performance</h2></div>
+  <p class="sdek">Profit and loss per name across the selected window, in the money you entered above. Price gain only &mdash; dividends are counted separately. A name held for many quarters accumulates many separate results.</p>
+  <div class="card">
+    <div class="scroll"><table id="plTable"></table></div>
+    <p class="recon" id="plRecon"></p>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><span class="snum">07</span><h2>The selection record</h2></div>
+  <p class="sdek">One row per name held in this window, ordered by lifetime profit. Each cell shows what that position made or lost in that quarter, in dollars, with the percentage beneath. Hatched cells are quarters spent out of the book.</p>
   <div class="card">
     <div class="scroll"><table id="ribbon"></table></div>
     <div class="legend">
@@ -218,21 +281,21 @@ footer{border-top:1px solid var(--rule);margin-top:46px;padding:24px 0 44px;colo
 </section>
 
 <section>
-  <div class="shead"><span class="snum">06</span><h2>Quarterly ledger</h2></div>
+  <div class="shead"><span class="snum">08</span><h2>The book, quarter by quarter</h2></div>
+  <p class="sdek">Every name held in a given quarter, sized equally because the strategy weights them equally, shaded and ordered by what each returned. Step through with the arrows, or click any quarter on the strip beneath.</p>
+  <div class="card" id="bookWrap2"></div>
+</section>
+
+<section>
+  <div class="shead"><span class="snum">09</span><h2>Quarterly ledger</h2></div>
   <p class="sdek">What each holding period returned, and which names left and arrived at that rebalance.</p>
   <div class="card scroll"><table id="qtable"></table></div>
 </section>
 
-<section>
-  <div class="shead"><span class="snum">07</span><h2>The book right now</h2></div>
-  <div class="card">
-    <p style="margin:0;font-size:14px;color:var(--muted)">Sixteen names currently held, opened at the start of <b id="curQ" style="color:var(--ink)"></b>.</p>
-    <div class="book" id="curBook"></div>
-  </div>
-</section>
+
 
 <section>
-  <div class="shead"><span class="snum">08</span><h2>How to read this</h2></div>
+  <div class="shead"><span class="snum">10</span><h2>How to read this</h2></div>
   <div class="card"><div class="notes">
     <div class="note"><h3>Two returns, not one</h3><p>Time-weighted return ignores when money went in and answers "how good were the rules". Money-weighted return (IRR) keeps the timing in and answers "how would my money actually have done". Turn on contributions and the two diverge; the gap is entirely down to timing.</p></div>
     <div class="note"><h3>How a quarter runs</h3><p>On the first trading day the book is rebuilt at equal weight and held untouched until the last. Departures are sold in full, arrivals bought fresh, survivors trimmed or topped up. Contributions arriving mid-quarter are bought straight into the current book.</p></div>
