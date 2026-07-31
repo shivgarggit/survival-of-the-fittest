@@ -39,11 +39,12 @@ jobs:
             if [ -f "$f" ]; then echo "OK      $f"
             else echo "MISSING $f"; fail=1; fi
           done
-          if grep -q "yfinance" refresh_data.py 2>/dev/null; then
-            echo "PROBLEM refresh_data.py is still the OLD yfinance version - replace it"
-            fail=1
+          if grep -q "api.tiingo.com" refresh_data.py 2>/dev/null; then
+            echo "OK      refresh_data.py talks to Tiingo"
           else
-            echo "OK      refresh_data.py is the Tiingo version"
+            echo "PROBLEM refresh_data.py does not reference api.tiingo.com"
+            echo "        It is probably the old Yahoo-based version - replace it"
+            fail=1
           fi
           if [ -z "$TIINGO_TOKEN" ]; then
             echo "PROBLEM TIINGO_TOKEN secret is empty or was never created"
