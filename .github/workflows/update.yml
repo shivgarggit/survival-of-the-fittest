@@ -1,18 +1,36 @@
 name: Refresh strategy data
 
+# Two independent things happen here and they must not take each other down.
+#
+#   A push that only touches site/  -> publish the site, no API calls at all.
+#   A schedule or manual run        -> also refresh the data from Tiingo.
+#
+# If the data refresh fails (rate limiting is the usual cause) the run does NOT
+# fail. It warns, keeps the last good portfolio.json, and publishes anyway.
+
 on:
   schedule:
     - cron: '30 21 * * 1-5'
   workflow_dispatch:
+    inputs:
+      skip_data:
+        description: 'Publish only, do not call the data provider'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/**'
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -20,70 +38,109 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Decide whether to refresh data
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.skip_data }}" = "true" ]; then
+            echo "refresh=no" >> $GITHUB_OUTPUT
+            echo "Publish-only run - the data provider will not be contacted."
+          else
+            echo "refresh=yes" >> $GITHUB_OUTPUT
+            echo "Full run - data will be refreshed."
+          fi
+
+      - name: Check the site files exist
+        run: |
+          fail=0
+          for f in site/index.html site/app.js site/portfolio.json; do
+            if [ -f "$f" ]; then echo "OK      $f"; else echo "MISSING $f"; fail=1; fi
+          done
+          [ "$fail" = "0" ] || { echo "Cannot publish without these."; exit 1; }
+
       - uses: actions/setup-python@v5
+        if: steps.mode.outputs.refresh == 'yes'
         with:
           python-version: '3.12'
 
-      - name: Preflight - check everything is in place
+      - name: Check the data files exist
+        if: steps.mode.outputs.refresh == 'yes'
         env:
           TIINGO_TOKEN: ${{ secrets.TIINGO_TOKEN }}
         run: |
-          echo "=== files in the repository root ==="
-          ls -la
-          echo
-          echo "=== site folder ==="
-          ls -la site 2>/dev/null || echo "  site/ DOES NOT EXIST"
-          echo
-          fail=0
-          for f in weights.xlsx refresh_data.py build_site.py site/index.html site/app.js; do
-            if [ -f "$f" ]; then echo "OK      $f"
-            else echo "MISSING $f"; fail=1; fi
+          for f in weights.xlsx refresh_data.py build_site.py; do
+            if [ -f "$f" ]; then echo "OK      $f"; else echo "MISSING $f"; fi
           done
           if grep -q "api.tiingo.com" refresh_data.py 2>/dev/null; then
             echo "OK      refresh_data.py talks to Tiingo"
           else
-            echo "PROBLEM refresh_data.py does not reference api.tiingo.com"
-            echo "        It is probably the old Yahoo-based version - replace it"
-            fail=1
+            echo "WARN    refresh_data.py does not reference api.tiingo.com"
           fi
           if [ -z "$TIINGO_TOKEN" ]; then
-            echo "PROBLEM TIINGO_TOKEN secret is empty or was never created"
-            echo "        Settings > Secrets and variables > Actions > New repository secret"
-            fail=1
+            echo "WARN    TIINGO_TOKEN is empty - the refresh will be skipped"
           else
             echo "OK      TIINGO_TOKEN is set (${#TIINGO_TOKEN} characters)"
           fi
-          echo
-          if [ "$fail" = "1" ]; then
-            echo "Preflight failed - fix the PROBLEM/MISSING lines above and re-run."
-            exit 1
-          fi
-          echo "Preflight passed."
 
       - name: Install dependencies
+        if: steps.mode.outputs.refresh == 'yes'
         run: pip install --quiet openpyxl
 
+      # continue-on-error: a throttled provider must never take the site down
       - name: Pull market data
+        id: pull
+        if: steps.mode.outputs.refresh == 'yes'
+        continue-on-error: true
         env:
           TIINGO_TOKEN: ${{ secrets.TIINGO_TOKEN }}
         run: python refresh_data.py --workbook weights.xlsx --json engine_data.json
 
       - name: Build published payload
-        run: python build_site.py --data engine_data.json --out site/portfolio.json --adjclose
-
-      - name: Fail if a price series leaked into the payload
+        id: payload
+        if: steps.pull.outcome == 'success'
+        continue-on-error: true
         run: |
+          cp site/portfolio.json site/portfolio.json.bak
+          python build_site.py --data engine_data.json --out site/portfolio.json --adjclose
           python - <<'PYEOF'
-          import json
+          import json, shutil
           p = json.load(open('site/portfolio.json'))
           assert 'px' not in p, 'price block present in published payload'
           allowed = {'Strategy','SPY','QQQ','SPMO','XLG','MAGS','RSP','PSLDX'}
-          assert set(p['series']) <= allowed, 'unexpected series: %s' % (set(p['series']) - allowed)
+          extra = set(p['series']) - allowed
+          assert not extra, 'unexpected series: %s' % extra
           n = len(p['dates'])
           assert n > 500, 'suspiciously short history: %d days' % n
           assert all(len(v) == n for v in p['series'].values()), 'series length mismatch'
-          print('payload OK: %d days, %d series, %d quarters' % (n, len(p['series']), len(p['quarters'])))
+          print('payload OK: %d days, %d series, %d quarters'
+                % (n, len(p['series']), len(p['quarters'])))
           PYEOF
+          rm -f site/portfolio.json.bak
+
+      - name: Restore the last good payload if the rebuild failed
+        if: steps.mode.outputs.refresh == 'yes' && steps.payload.outcome != 'success'
+        run: |
+          if [ -f site/portfolio.json.bak ]; then
+            mv site/portfolio.json.bak site/portfolio.json
+            echo "Restored the previous payload."
+          else
+            git checkout -- site/portfolio.json || true
+          fi
+          echo "::warning::Data refresh did not complete. Publishing the last good data."
+          echo "Most likely cause: the free-tier hourly request ceiling. Try again in an hour."
+
+      - name: Commit the refreshed data
+        if: steps.payload.outcome == 'success'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet site/portfolio.json; then
+            echo "No change in the payload."
+          else
+            git add site/portfolio.json
+            git commit -m "Data refresh $(date -u +%Y-%m-%d)"
+            git push
+            echo "Committed the refreshed payload."
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
