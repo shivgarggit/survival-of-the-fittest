@@ -2,8 +2,8 @@
 """
 refresh_data.py - pull prices and dividends from Tiingo and build engine_data.json.
 
-Replaces the earlier yfinance version, which ignored your API token and does not
-work on CI runners because Yahoo blocks datacentre IP ranges.
+Talks to Tiingo directly. Replaces the earlier Yahoo-based fetcher, which ignored
+your API token and does not work on CI runners because Yahoo blocks datacentre IPs.
 
 Reads only the quarterly roster from weights.xlsx. Everything else comes from Tiingo.
 
@@ -22,6 +22,12 @@ except ImportError:
 BASE = "https://api.tiingo.com/tiingo/daily"
 TICKER_FIX = {"APPL": "AAPL", "BRKB": "BRK-B", "VISA": "V", "PNJ": "PG", "BRK.B": "BRK-B"}
 BENCHMARKS = ["SPY", "QQQ", "SPMO", "XLG", "MAGS", "RSP", "PSLDX"]
+
+# Some symbols are punctuated differently by different vendors. Try each in turn.
+VARIANTS = {
+    "BRK-B": ["BRK-B", "BRK.B", "BRKB", "BRK_B"],
+    "BF-B":  ["BF-B", "BF.B", "BFB"],
+}
 
 
 def http_json(url, tries=4):
@@ -54,9 +60,14 @@ def http_json(url, tries=4):
 
 
 def fetch(ticker, token, start, end):
-    q = urllib.parse.urlencode({"startDate": start, "endDate": end,
-                                "format": "json", "token": token})
-    return http_json("%s/%s/prices?%s" % (BASE, ticker.lower(), q))
+    """Try each known spelling of the symbol; return (rows, symbol_that_worked)."""
+    for sym in VARIANTS.get(ticker, [ticker]):
+        q = urllib.parse.urlencode({"startDate": start, "endDate": end,
+                                    "format": "json", "token": token})
+        rows = http_json("%s/%s/prices?%s" % (BASE, sym.lower(), q))
+        if rows:
+            return rows, sym
+    return None, ticker
 
 
 def read_weights(path):
@@ -100,23 +111,50 @@ def main():
 
     raw, failed = {}, []
     allt = comps + [b for b in BENCHMARKS if b not in comps]
-    for i, t in enumerate(allt, 1):
-        print("  [%2d/%2d] %-8s" % (i, len(allt), t), end="", flush=True)
-        rows = fetch(t, a.token, start, end)
-        if not rows:
-            print("NO DATA"); failed.append(t); continue
-        raw[t] = rows
-        nd = sum(1 for r in rows if (r.get("divCash") or 0) > 0)
-        ns = sum(1 for r in rows if (r.get("splitFactor") or 1) != 1)
-        print("%5d rows, %2d dividends, %d splits" % (len(rows), nd, ns), flush=True)
-        time.sleep(0.7)                       # stay under the hourly ceiling
+
+    def pull(tickers, label, pace):
+        out = []
+        for i, t in enumerate(tickers, 1):
+            print("  %s [%2d/%2d] %-8s" % (label, i, len(tickers), t), end="", flush=True)
+            rows, sym = fetch(t, a.token, start, end)
+            if not rows:
+                print("NO DATA", flush=True); out.append(t); continue
+            raw[t] = rows
+            nd = sum(1 for r in rows if (r.get("divCash") or 0) > 0)
+            ns = sum(1 for r in rows if (r.get("splitFactor") or 1) != 1)
+            note = "" if sym == t else "  (matched as %s)" % sym
+            print("%5d rows, %2d dividends, %d splits%s" % (len(rows), nd, ns, note), flush=True)
+            time.sleep(pace)
+        return out
+
+    failed = pull(allt, "  ", 1.5)
+
+    if failed:
+        print("\n%d symbol(s) returned nothing: %s" % (len(failed), ", ".join(failed)))
+        print("Waiting 90s in case this is rate limiting, then retrying those only.\n", flush=True)
+        time.sleep(90)
+        failed = pull(failed, "retry", 3.0)
 
     missing = [t for t in comps if t not in raw]
-    if missing:
-        sys.exit("\nFATAL: no data for components %s - the backtest would be wrong. Stopping."
-                 % ", ".join(missing))
-    if failed:
-        print("\nWARNING: no data for %s - continuing without them." % ", ".join(failed))
+    if missing or failed:
+        print("\n" + "=" * 60)
+        print("FAILURE SUMMARY")
+        print("=" * 60)
+        for t in failed:
+            kind = "COMPONENT (fatal)" if t in comps else "benchmark (skippable)"
+            print("  %-8s %s" % (t, kind))
+        print()
+        if missing:
+            print("These are strategy components, so the backtest cannot be built without")
+            print("them. Most likely causes, in order:")
+            print("  1. Tiingo does not cover that symbol under this spelling.")
+            print("     Test it in a browser:")
+            print("     https://api.tiingo.com/tiingo/daily/<symbol>/prices"
+                  "?startDate=2026-07-01&token=YOURTOKEN")
+            print("  2. You hit the hourly request ceiling. Wait an hour and re-run.")
+            print("  3. The symbol is spelled differently in weights.xlsx than at Tiingo.")
+            sys.exit("\nStopping rather than publishing a wrong backtest.")
+        print("All missing symbols are benchmarks. Continuing without them.")
 
     cal = sorted({r["date"][:10] for t in comps for r in raw[t]})
     pos = {d: i for i, d in enumerate(cal)}
