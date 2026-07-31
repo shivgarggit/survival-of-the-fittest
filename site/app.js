@@ -11,6 +11,8 @@
 "use strict";
 var $=function(s){return document.querySelector(s)},
     $$=function(s){return [].slice.call(document.querySelectorAll(s))};
+function setTxt(sel,v){var e=$(sel); if(e)e.textContent=v}
+function setHtml(sel,v){var e=$(sel); if(e)e.innerHTML=v}
 var NS='http://www.w3.org/2000/svg';
 function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);return e}
 var BN={Strategy:'Strategy',SPY:'S&P 500',QQQ:'Nasdaq 100',SPMO:'S&P Momentum',
@@ -381,7 +383,7 @@ function renderDiv(){
     '<div class="ds"><span>Share of ending value</span><b>'+pc0(tot/R.strat.m.final,1)+'</b></div>'+
     '<div class="ds"><span>Last four quarters</span><b>'+money(last4)+'</b></div>'+
     '<div class="ds"><span>Yield on money invested</span><b>'+pc0(last4/inv,2)+'</b></div>';
-  $('#divBasisTxt').textContent=D.divBasis;
+  setTxt('#divBasisTxt', D.divBasis||'');
 }
 function render(){renderHead();drawGrowth();drawDD();renderMetrics();renderHeat();renderQ();renderDiv()}
 
@@ -418,27 +420,34 @@ function build(){
 }
 
 /* ---------------- boot ---------------- */
+var LOADED=false;
 fetch('portfolio.json?v='+Date.now()).then(function(r){
-  if(!r.ok)throw new Error('HTTP '+r.status);return r.json()
+  if(!r.ok)throw new Error('HTTP '+r.status+' fetching portfolio.json');
+  return r.json()
 }).then(function(j){
+  LOADED=true;
   D=j;N=D.dates.length-1;LAST=D.dates[N];
   Object.keys(state.show).forEach(function(k){if(!D.series[k])delete state.show[k]});
   if(!D.series[state.ref])state.ref=Object.keys(state.show)[0];
   document.body.classList.remove('loading');
-  $('#asOf').textContent=D.asOf;
-  $('#gen').textContent=D.generated.replace('T',' ').replace('Z',' UTC');
-  $('#basis').textContent=D.basis;
-  $('#curQ').textContent=D.currentQ;
-  $('#curBook').innerHTML=D.current.map(function(t){return '<span>'+t+'</span>'}).join('');
-  $('#turn').textContent=D.avgTurnover;
-  $('#nq').textContent=D.nQuarters;
-  $('#nc').textContent=D.nComponents;
+  setTxt('#asOf', D.asOf);
+  setTxt('#gen', String(D.generated).replace('T',' ').replace('Z',' UTC'));
+  setTxt('#curQ', D.currentQ);
+  setHtml('#curBook', (D.current||[]).map(function(t){return '<span>'+t+'</span>'}).join(''));
+  setTxt('#turn', D.avgTurnover);
+  setTxt('#nq', D.nQuarters);
+  setTxt('#nc', D.nComponents);
   build();compute();renderRibbon();
 }).catch(function(e){
   document.body.classList.remove('loading');
-  $('#boot').innerHTML='<div class="err"><b>Could not load the data file.</b><br>'+
-    'portfolio.json did not load ('+e.message+'). If you are opening this page directly from disk, '+
-    'browsers block local fetch requests \u2014 serve the folder over HTTP instead, for example '+
-    '<code>python3 -m http.server</code> from this directory.</div>';
+  console.error(e);
+  var msg = LOADED
+    ? '<b>The data loaded, but the page failed to draw it.</b><br>'+
+      'Error: <code>'+e.message+'</code><br>This is a bug in app.js, not a data problem.'
+    : '<b>Could not load the data file.</b><br>'+
+      'portfolio.json did not load (<code>'+e.message+'</code>). If you are opening this page '+
+      'directly from disk, browsers block local fetch requests \u2014 serve the folder over HTTP '+
+      'instead, for example <code>python3 -m http.server</code> from this directory.';
+  setHtml('#boot', '<div class="err">'+msg+'</div>');
 });
 })();
