@@ -28,6 +28,20 @@ function pc(v,d){return v===null||v===undefined||!isFinite(v)?'\u2014':(v>=0?'+'
 function pc0(v,d){return v===null||!isFinite(v)?'\u2014':(v*100).toFixed(d===undefined?1:d)+'%'}
 function num(v,d){return v===null||v===undefined||!isFinite(v)?'\u2014':v.toFixed(d===undefined?2:d)}
 function sg(v){return v>0?'pos':v<0?'neg':''}
+function compact(v){
+  if(v===null||v===undefined||!isFinite(v))return '\u2014';
+  var a=Math.abs(v), s=v<0?'\u2212':'+';
+  if(a>=1e6)return s+'$'+(a/1e6).toFixed(a>=1e7?0:1)+'M';
+  if(a>=1000)return s+'$'+(a/1000).toFixed(a>=10000?0:1)+'k';
+  return s+'$'+Math.round(a);
+}
+function days(a,b){return Math.round((Date.parse(b)-Date.parse(a))/864e5)}
+function dur(d){
+  if(d===null)return '\u2014';
+  if(d<60)return d+'d';
+  if(d<365)return (d/30.44).toFixed(0)+'mo';
+  return (d/365.25).toFixed(1)+'y';
+}
 function fidx(s){for(var i=0;i<=N;i++)if(D.dates[i]>=s)return i;return N}
 function lidx(s){for(var i=N;i>=0;i--)if(D.dates[i]<=s)return i;return 0}
 
@@ -261,7 +275,9 @@ function renderHead(){
          ['Deepest fall',pc(m.maxdd),D.dates[R.i0+m.ddInfo.troughIdx],'neg'],
          ['Volatility',pc0(m.vol),'Sharpe '+num(m.sharpe)+' \u00b7 Sortino '+num(m.sortino),''],
          ['Beta vs '+R.refK,num(m.beta),'alpha '+pc(m.alpha),''],
-         ['Window',m.years.toFixed(1)+'y',R.strat.res.flows.length+' cash flow'+(R.strat.res.flows.length>1?'s':''),'']];
+         ['Total contributed',money(m.invested),
+          R.o.dca? money(R.o.initial)+' start + '+(R.strat.res.flows.length-1)+' \u00d7 '+money(R.o.dca)
+                 : 'single payment, no top-ups','']];
   $('#head').innerHTML=c.map(function(x){
     return '<div class="stat"><div class="k">'+x[0]+'</div><div class="v '+x[3]+'">'+x[1]+'</div><div class="n">'+x[2]+'</div></div>'}).join('');
   $('#winTxt').textContent=D.dates[R.i0]+'  \u2192  '+D.dates[R.i1];
@@ -297,14 +313,25 @@ function renderHeat(){
   var mx=Math.max.apply(null,ks.map(function(k){return Math.abs(mo[k])}))||0.01;
   var MM=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var h='<thead><tr><th>Year</th>'+MM.map(function(m){return '<th>'+m+'</th>'}).join('')+'<th>Year</th></tr></thead><tbody>';
+  var ys=[];
   yrs.forEach(function(y){h+='<tr><td class="yr">'+y+'</td>';var pr=1,any=false;
     for(var m=1;m<=12;m++){var k=y+'-'+(m<10?'0':'')+m,v=mo[k];
       if(v===undefined){h+='<td><span class="hc empty"></span></td>';continue}
       any=true;pr*=(1+v);var a=Math.pow(Math.abs(v)/mx,.65);
       var col=v>=0?'rgba(27,122,70,'+(0.10+0.62*a).toFixed(3)+')':'rgba(179,38,30,'+(0.10+0.62*a).toFixed(3)+')';
       h+='<td><span class="hc" style="background:'+col+'" title="'+k+'  '+pc(v,2)+'">'+(v*100).toFixed(1)+'</span></td>'}
-    h+='<td class="'+sg(pr-1)+'" style="font-weight:600">'+(any?pc(pr-1,1):'')+'</td></tr>'});
-  $('#heat').innerHTML=h+'</tbody>';
+    ys.push({y:y,r:pr-1,any:any});
+    h+='<td class="ycell" data-y="'+y+'"></td></tr>'});
+  setHtml('#heat',h+'</tbody>');
+  var ymx=Math.max.apply(null,ys.map(function(x){return Math.abs(x.r)}))||0.01;
+  ys.forEach(function(x){
+    var c=document.querySelector('#heat td.ycell[data-y="'+x.y+'"]'); if(!c)return;
+    if(!x.any){c.innerHTML='';return}
+    var w=Math.abs(x.r)/ymx*100, pos=x.r>=0;
+    c.innerHTML='<div class="ybar"><span class="yv '+sg(x.r)+'">'+pc(x.r,1)+'</span>'+
+      '<span class="ytrack"><i style="width:'+w.toFixed(1)+'%;background:'+
+      (pos?'var(--gain)':'var(--loss)')+'"></i></span></div>';
+  });
 }
 function renderQ(){
   var qs=D.quarters.filter(function(q){return q.end>=D.dates[R.i0]&&q.start<=D.dates[R.i1]});
@@ -325,20 +352,34 @@ function ramp(v){var C=0.30,t=Math.max(-1,Math.min(1,v/C)),mid=[241,243,247];
   var end=t>=0?[20,102,59]:[179,38,30],a=Math.pow(Math.abs(t),.72);
   return 'rgb('+mid.map(function(c,i){return Math.round(c+(end[i]-c)*a)}).join(',')+')'}
 function renderRibbon(){
-  var names={};D.quarters.forEach(function(q){q.holdings.forEach(function(t){
-    names[t]=(names[t]||0)+(q.cret[t]||0)})});
-  var order=Object.keys(names).sort(function(a,b){return names[b]-names[a]});
-  var h='<thead><tr><th class="tt"></th>'+D.quarters.map(function(q){
-    return '<th class="qh">'+q.q+'</th>'}).join('')+'<th class="tl">Held</th></tr></thead><tbody>';
-  order.forEach(function(t){h+='<tr><th class="tt">'+t+'</th>';var held=0;
-    D.quarters.forEach(function(q){var v=q.cret[t];
-      if(v===undefined){h+='<td class="rc"><div class="cb off"></div></td>'}
-      else{held++;h+='<td class="rc"><div class="cb on" style="background:'+ramp(v)+'" title="'+t+' \u00b7 '+q.q+' \u00b7 '+pc(v)+'"></div></td>'}});
-    h+='<td class="tl">'+held+'</td></tr>'});
-  $('#ribbon').innerHTML=h+'</tbody>';
-  var s='';for(var i=0;i<=20;i++)s+='<i style="background:'+ramp(-0.3+i*0.03)+'"></i>';
-  $('#scale').innerHTML=s;
+  var cp=R._cp; if(!cp||!cp.qs.length){setHtml('#ribbon','');return}
+  var order=cp.rows;
+  var h='<thead><tr><th class="tt"></th>'+cp.qs.map(function(q){
+    return '<th class="qh">'+q.q+'</th>'}).join('')+
+    '<th class="tl">P&amp;L</th></tr></thead><tbody>';
+  order.forEach(function(r){
+    h+='<tr><th class="tt">'+r.t+'</th>';
+    cp.qs.forEach(function(q){
+      var v=q.cret[r.t];
+      if(v===undefined){h+='<td class="rc"><div class="cb off"></div></td>';return}
+      var pl=q.cell[r.t];
+      h+='<td class="rc"><div class="cb on" style="background:'+ramp(v)+
+         '" title="'+r.t+' \u00b7 '+q.q+' \u00b7 '+pc(v)+' \u00b7 '+money(pl)+'">'+
+         '<em>'+compact(pl)+'</em><i>'+pc(v,0)+'</i></div></td>';
+    });
+    h+='<td class="tl '+sg(r.pl)+'">'+money(r.pl)+'</td></tr>';
+  });
+  setHtml('#ribbon',h+'</tbody>');
+  var sc=$('#scale'); if(sc){var g='';
+    for(var i=0;i<=20;i++)g+='<i style="background:'+ramp(-0.3+i*0.03)+'"></i>';
+    sc.innerHTML=g}
 }
+
+/* Component P&L. Inside a quarter every name opens at an equal slice of the
+   capital, so name t's gain is (capital/n) * cret[t]. We then rescale so the
+   pieces sum to the quarter's actual price gain, which folds in any
+   contributions that landed mid-quarter. */
+
 function divSeries(){
   var out=[],cum=0,nav=R.strat.res.nav;
   D.quarters.forEach(function(q){
@@ -353,9 +394,11 @@ function divSeries(){
 }
 function renderDiv(){
   var ds=divSeries();
-  if(!ds.length){$('#divWrap').style.display='none';return}
-  $('#divWrap').style.display='';
-  var svg=$('#divChart');svg.innerHTML='';
+  var wrap=$('#divWrap');
+  if(!ds.length){if(wrap)wrap.style.display='none';return}
+  if(wrap)wrap.style.display='';
+  var svg=$('#divChart'); if(!svg)return;
+  svg.innerHTML='';
   var w=1000,h=240,ml=64,mr=58,mt=14,mb=34,pw=w-ml-mr,ph=h-mt-mb,m=ds.length;
   var mx=Math.max.apply(null,ds.map(function(d){return d.amt}))||1;
   var cmx=ds[ds.length-1].cum||1,bw=pw/m*0.62;
@@ -366,8 +409,8 @@ function renderDiv(){
   ds.forEach(function(d,i){var x=ml+(i+0.5)/m*pw,bh=(d.amt/mx)*ph;
     var r=el('rect',{x:(x-bw/2).toFixed(2),y:(mt+ph-bh).toFixed(2),width:bw.toFixed(2),
       height:Math.max(1,bh).toFixed(2),class:'dbar'});
-    r.appendChild(el('title',{}));r.lastChild.textContent=d.q+'  '+money(d.amt)+'   ('+(d.dy*100).toFixed(2)+'% of capital)';
-    svg.appendChild(r);
+    var ti=el('title',{}); ti.textContent=d.q+'  '+money(d.amt)+'   ('+(d.dy*100).toFixed(2)+'% of capital)';
+    r.appendChild(ti); svg.appendChild(r);
     if(d.qn===1){var t=el('text',{x:x.toFixed(1),y:h-12,class:'ax','text-anchor':'middle'});
       t.textContent=d.y;svg.appendChild(t)}});
   var p='';ds.forEach(function(d,i){p+=(i?'L':'M')+(ml+(i+0.5)/m*pw).toFixed(2)+' '+(mt+ph-(d.cum/cmx)*ph).toFixed(2)});
@@ -378,14 +421,165 @@ function renderDiv(){
   var lb=el('text',{x:w-mr+9,y:mt-2,class:'ax','text-anchor':'start'});lb.textContent='cumulative';svg.appendChild(lb);
   var tot=ds[ds.length-1].cum,inv=R.strat.m.invested;
   var last4=ds.slice(-4).reduce(function(a,b){return a+b.amt},0);
-  $('#divStats').innerHTML=
+  setHtml('#divStats',
     '<div class="ds"><span>Collected in window</span><b>'+money(tot)+'</b></div>'+
     '<div class="ds"><span>Share of ending value</span><b>'+pc0(tot/R.strat.m.final,1)+'</b></div>'+
     '<div class="ds"><span>Last four quarters</span><b>'+money(last4)+'</b></div>'+
-    '<div class="ds"><span>Yield on money invested</span><b>'+pc0(last4/inv,2)+'</b></div>';
+    '<div class="ds"><span>Yield on money invested</span><b>'+pc0(last4/inv,2)+'</b></div>');
   setTxt('#divBasisTxt', D.divBasis||'');
 }
-function render(){renderHead();drawGrowth();drawDD();renderMetrics();renderHeat();renderQ();renderDiv()}
+
+function componentPL(){
+  var nav=R.strat.res.nav, byT={}, qs=[];
+  var flowAt={}; R.strat.res.flows.forEach(function(f){flowAt[f.i]=(flowAt[f.i]||0)+f.amt});
+  var list=[];
+  D.quarters.forEach(function(q){
+    var a=D.dates.indexOf(q.start), b=D.dates.indexOf(q.end);
+    if(a<0||b<0||b<R.i0||a>R.i1)return;
+    list.push({q:q,a:a,b:b});
+  });
+  list.forEach(function(x,k){
+    var A=Math.max(x.a,R.i0);
+    // Run each holding period through to the NEXT rebalance, not to the quarter's
+    // last close. Otherwise the one-day move between a quarter closing and the next
+    // opening belongs to no one, and the pieces stop adding up to the portfolio.
+    var B=(k<list.length-1)? Math.min(list[k+1].a,R.i1) : Math.min(x.b,R.i1);
+    if(B<=A)return;
+    var open=nav[A-R.i0], close=nav[B-R.i0];
+    if(open===null||close===null||!isFinite(open)||!isFinite(close))return;
+    var contrib=0;
+    for(var i=A+1;i<=B;i++) contrib+=(flowAt[i]||0);
+    var q=x.q;
+    var names=q.holdings.filter(function(t){return q.cret[t]!==undefined});
+    var n=names.length||1, raw={}, sum=0;
+    names.forEach(function(t){raw[t]=q.cret[t]/n; sum+=raw[t]});
+    // Each name's own price move, then share out whatever the quarter actually
+    // did beyond that - the handover day, dividends, mid-quarter contributions -
+    // equally across the names held. Additive, so it cannot blow up when the
+    // component returns happen to cancel out.
+    var actual=close-open-contrib, cell={}, base=0;
+    names.forEach(function(t){ cell[t]=open*raw[t]; base+=cell[t] });
+    var resid=(actual-base)/n;
+    names.forEach(function(t){ cell[t]+=resid });
+    qs.push({q:q.q,start:q.start,end:q.end,names:names,cell:cell,cret:q.cret,
+             open:open,close:close,gain:actual,contrib:contrib,
+             ret:(close-contrib)/open-1,
+             partial:(A!==x.a||B<x.b)});
+    names.forEach(function(t){
+      var d=byT[t]||(byT[t]={t:t,pl:0,held:0,wins:0});
+      d.pl+=cell[t]; d.held++; if(q.cret[t]>0)d.wins++;
+    });
+  });
+  var rows=Object.keys(byT).map(function(t){return byT[t]});
+  rows.sort(function(x,y){return y.pl-x.pl});
+  return {rows:rows,qs:qs};
+}
+
+function renderComponentPL(){
+  var cp=componentPL(); R._cp=cp;
+  if(!cp.rows.length){setHtml('#plTable','');return}
+  var mx=Math.max.apply(null,cp.rows.map(function(r){return Math.abs(r.pl)}))||1;
+  var tot=cp.rows.reduce(function(a,b){return a+b.pl},0);
+  var h='<thead><tr><th>Name</th><th>Quarters held</th><th>Quarters up</th>'+
+        '<th>Total P&amp;L</th><th>Avg per quarter</th><th>Share</th><th></th></tr></thead><tbody>';
+  cp.rows.forEach(function(r){
+    h+='<tr><td style="font-weight:600">'+r.t+'</td><td>'+r.held+'</td>'+
+       '<td>'+Math.round(r.wins/r.held*100)+'%</td>'+
+       '<td class="'+sg(r.pl)+'">'+money(r.pl)+'</td>'+
+       '<td class="'+sg(r.pl)+'">'+money(r.pl/r.held)+'</td>'+
+       '<td>'+(tot>0?pc0(r.pl/tot,1):'\u2014')+'</td>'+
+       '<td class="barcell"><span class="bar" style="width:'+(Math.abs(r.pl)/mx*100).toFixed(1)+
+         '%;background:'+(r.pl>=0?'var(--gain)':'var(--loss)')+'"></span></td></tr>';
+  });
+  h+='<tr class="tot"><td>Total</td><td></td><td></td><td class="'+sg(tot)+'">'+money(tot)+
+     '</td><td></td><td>100%</td><td></td></tr>';
+  setHtml('#plTable',h+'</tbody>');
+  var prof=R.strat.m.profit;
+  setTxt('#plRecon','These add up to '+money(tot)+' against a portfolio profit of '+money(prof)+
+    (Math.abs(tot-prof)>Math.max(1,Math.abs(prof)*0.005) ? ' \u2014 the difference is rounding.' : '.'));
+}
+
+function ddEpisodes(nav){
+  var eps=[],peak=null,peakI=0,inEp=false,trough=0,troughI=0;
+  for(var i=0;i<nav.length;i++){
+    var v=nav[i]; if(v===null||!isFinite(v)||v<=0)continue;
+    if(peak===null||v>=peak){
+      if(inEp){eps.push({peakI:peakI,troughI:troughI,recI:i,depth:trough/peak-1});inEp=false}
+      peak=v;peakI=i;
+    }else{
+      if(!inEp){inEp=true;trough=v;troughI=i}
+      else if(v<trough){trough=v;troughI=i}
+    }
+  }
+  if(inEp)eps.push({peakI:peakI,troughI:troughI,recI:null,depth:trough/peak-1});
+  return eps.filter(function(e){return e.depth<-0.03})
+            .sort(function(a,b){return a.depth-b.depth});
+}
+function renderDrawdowns(){
+  var eps=ddEpisodes(R.strat.res.nav).slice(0,12);
+  if(!eps.length){setHtml('#ddTable','');setHtml('#ddStats','');return}
+  var mx=Math.abs(eps[0].depth);
+  var h='<thead><tr><th>Depth</th><th></th><th>Peak</th><th>Trough</th><th>Recovered</th>'+
+        '<th>Fall</th><th>Recovery</th><th>Total</th></tr></thead><tbody>';
+  eps.forEach(function(e){
+    var pd=D.dates[R.i0+e.peakI], td=D.dates[R.i0+e.troughI];
+    var rd=e.recI===null?null:D.dates[R.i0+e.recI];
+    var fall=days(pd,td), rec=rd?days(td,rd):null;
+    h+='<tr><td class="neg" style="font-weight:600">'+pc(e.depth)+'</td>'+
+       '<td class="barcell"><span class="bar" style="width:'+(Math.abs(e.depth)/mx*100).toFixed(0)+
+         '%;background:var(--loss)"></span></td>'+
+       '<td class="dim">'+pd+'</td><td class="dim">'+td+'</td>'+
+       '<td class="'+(rd?'dim':'neg')+'">'+(rd||'still under water')+'</td>'+
+       '<td>'+dur(fall)+'</td><td>'+dur(rec)+'</td>'+
+       '<td>'+(rec===null?'\u2014':dur(fall+rec))+'</td></tr>';
+  });
+  setHtml('#ddTable',h+'</tbody>');
+  var under=eps.filter(function(e){return e.recI===null}).length;
+  var done=eps.filter(function(e){return e.recI!==null});
+  var ar=done.length?done.reduce(function(a,e){
+    return a+days(D.dates[R.i0+e.troughI],D.dates[R.i0+e.recI])},0)/done.length:null;
+  setHtml('#ddStats',
+    '<div class="ds"><span>Falls over 3%</span><b>'+eps.length+'</b></div>'+
+    '<div class="ds"><span>Deepest</span><b class="neg">'+pc(eps[0].depth)+'</b></div>'+
+    '<div class="ds"><span>Typical recovery</span><b>'+(ar?dur(Math.round(ar)):'\u2014')+'</b></div>'+
+    '<div class="ds"><span>Under water now</span><b>'+(under?'yes':'no')+'</b></div>');
+}
+
+function renderBook(){
+  var cp=R._cp; if(!cp||!cp.qs.length){setHtml('#bookWrap2','');return}
+  if(R._bookIdx===undefined||R._bookIdx>=cp.qs.length)R._bookIdx=cp.qs.length-1;
+  var i=R._bookIdx, q=cp.qs[i], prev=i>0?cp.qs[i-1]:null;
+  var inn=prev?q.names.filter(function(t){return prev.names.indexOf(t)<0}):[];
+  var out=prev?prev.names.filter(function(t){return q.names.indexOf(t)<0}):[];
+  var head='<div class="bnav">'+
+    '<button class="chip" id="bPrev"'+(i===0?' disabled':'')+'>\u25c0</button>'+
+    '<div class="btitle"><b>'+q.q+'</b><span>'+q.start+' \u2013 '+q.end+
+      (q.partial?' \u00b7 clipped to window':'')+'</span></div>'+
+    '<button class="chip" id="bNext"'+(i===cp.qs.length-1?' disabled':'')+'>\u25b6</button>'+
+    '<div class="bsum"><span>Opened</span><b>'+money(q.open)+'</b></div>'+
+    '<div class="bsum"><span>Closed</span><b>'+money(q.close)+'</b></div>'+
+    '<div class="bsum"><span>Return</span><b class="'+sg(q.ret)+'">'+pc(q.ret)+'</b></div></div>';
+  var sorted=q.names.slice().sort(function(a,b){return q.cret[b]-q.cret[a]});
+  var tiles=sorted.map(function(t){
+    return '<div class="tile" style="background:'+ramp(q.cret[t])+'">'+
+      (inn.indexOf(t)>=0?'<i class="badge">new</i>':'')+
+      '<b>'+t+'</b><u>'+pc(q.cret[t])+'</u><s>'+compact(q.cell[t])+'</s></div>';
+  }).join('');
+  var chg=(out.length||inn.length)?'<div class="bchg">'+
+      (out.length?'<span class="gone">Left: '+out.join(', ')+'</span>':'')+
+      (inn.length?'<span class="came">Joined: '+inn.join(', ')+'</span>':'')+'</div>':'';
+  var strip='<div class="qstrip">'+cp.qs.map(function(x,j){
+    return '<i class="'+(j===i?'on':'')+'" data-j="'+j+'" title="'+x.q+'  '+pc(x.ret)+
+      '" style="background:'+ramp(x.ret)+'"></i>'}).join('')+'</div>';
+  setHtml('#bookWrap2', head+'<div class="tiles">'+tiles+'</div>'+chg+strip);
+  var p=$('#bPrev'),n=$('#bNext');
+  if(p)p.addEventListener('click',function(){if(R._bookIdx>0){R._bookIdx--;renderBook()}});
+  if(n)n.addEventListener('click',function(){if(R._bookIdx<cp.qs.length-1){R._bookIdx++;renderBook()}});
+  $$('#bookWrap2 .qstrip i').forEach(function(e){
+    e.addEventListener('click',function(){R._bookIdx=+this.dataset.j;renderBook()})});
+}
+
+function render(){renderHead();drawGrowth();drawDD();renderMetrics();renderDrawdowns();renderDiv();renderHeat();renderComponentPL();renderRibbon();renderBook();renderQ()}
 
 /* ---------------- controls ---------------- */
 function build(){
@@ -432,12 +626,10 @@ fetch('portfolio.json?v='+Date.now()).then(function(r){
   document.body.classList.remove('loading');
   setTxt('#asOf', D.asOf);
   setTxt('#gen', String(D.generated).replace('T',' ').replace('Z',' UTC'));
-  setTxt('#curQ', D.currentQ);
-  setHtml('#curBook', (D.current||[]).map(function(t){return '<span>'+t+'</span>'}).join(''));
   setTxt('#turn', D.avgTurnover);
   setTxt('#nq', D.nQuarters);
   setTxt('#nc', D.nComponents);
-  build();compute();renderRibbon();
+  build();compute();
 }).catch(function(e){
   document.body.classList.remove('loading');
   console.error(e);
