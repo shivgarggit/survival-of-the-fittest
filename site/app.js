@@ -687,10 +687,23 @@ function summarise(){
   if(state.dca>0&&state.freq!=='none')t+=' + '+money(state.dca)+' '+fr[state.freq];
   setTxt('#mbTxt',t);
 }
-function openSheet(){var p=$('#panelBody');if(p)p.classList.add('open');
-  document.body.classList.add('noscroll');var b=$('#mobBar');if(b)b.setAttribute('aria-expanded','true')}
-function closeSheet(){var p=$('#panelBody');if(p)p.classList.remove('open');
-  document.body.classList.remove('noscroll');var b=$('#mobBar');if(b)b.setAttribute('aria-expanded','false')}
+function openSheet(){
+  var p=$('#panelBody'); if(!p)return;
+  // Re-parent to <body>. A fixed element is sized by its nearest ancestor that
+  // has a filter, transform or opacity, and the sticky panel has all three risks.
+  if(p.parentNode!==document.body){ p._home=p.parentNode; document.body.appendChild(p) }
+  p.classList.add('open');
+  document.body.classList.add('noscroll');
+  var b=$('#mobBar'); if(b)b.setAttribute('aria-expanded','true');
+  p.scrollTop=0;
+}
+function closeSheet(){
+  var p=$('#panelBody'); if(!p)return;
+  p.classList.remove('open');
+  if(p._home && p.parentNode===document.body){ p._home.appendChild(p); p._home=null }
+  document.body.classList.remove('noscroll');
+  var b=$('#mobBar'); if(b)b.setAttribute('aria-expanded','false');
+}
 
 function build(){
   $('#benchChips').innerHTML=Object.keys(state.show).map(function(k){
@@ -720,6 +733,7 @@ function build(){
   var bar=$('#mobBar'); if(bar)bar.addEventListener('click',function(){
     var p=$('#panelBody'); if(p&&p.classList.contains('open'))closeSheet(); else openSheet()});
   var done=$('#sheetDone'); if(done)done.addEventListener('click',closeSheet);
+  if(document.addEventListener)document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeSheet() });
   $('#from').min=$('#to').min=D.dates[0];$('#from').max=$('#to').max=LAST;
   $('#from').value=state.from=D.dates[0];$('#to').value=state.to=LAST;
   window.addEventListener('resize',function(){clearTimeout(window._rz);
