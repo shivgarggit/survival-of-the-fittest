@@ -105,7 +105,8 @@ jobs:
           import json, shutil
           p = json.load(open('site/portfolio.json'))
           assert 'px' not in p, 'price block present in published payload'
-          allowed = {'Strategy','SPY','QQQ','SPMO','XLG','MAGS','RSP','PSLDX'}
+          allowed = {'Strategy','SPY','QQQ','SPMO','XLG','MAGS','RSP','PSLDX',
+                     'SMH','VGT','TOPT'}
           extra = set(p['series']) - allowed
           assert not extra, 'unexpected series: %s' % extra
           n = len(p['dates'])
