@@ -21,7 +21,8 @@ except ImportError:
 
 BASE = "https://api.tiingo.com/tiingo/daily"
 TICKER_FIX = {"APPL": "AAPL", "BRKB": "BRK-B", "VISA": "V", "PNJ": "PG", "BRK.B": "BRK-B"}
-BENCHMARKS = ["SPY", "QQQ", "SPMO", "XLG", "MAGS", "RSP", "PSLDX"]
+BENCHMARKS = ["SPY", "QQQ", "SPMO", "XLG", "MAGS", "RSP", "PSLDX",
+              "SMH", "VGT", "TOPT"]
 
 # Some symbols are punctuated differently by different vendors. Try each in turn.
 VARIANTS = {
