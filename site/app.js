@@ -22,12 +22,14 @@ function setHtml(sel,v){var e=$(sel); if(e)e.innerHTML=v}
 var NS='http://www.w3.org/2000/svg';
 function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);return e}
 var BN={Strategy:'Strategy',SPY:'S&P 500',QQQ:'Nasdaq 100',SPMO:'S&P Momentum',
-        XLG:'S&P Top 50',MAGS:'Magnificent 7',RSP:'S&P Equal Weight'};
+        XLG:'S&P Top 50',MAGS:'Magnificent 7',RSP:'S&P Equal Weight',
+        SMH:'Semiconductors',VGT:'Info Tech',TOPT:'S&P Top 20',PSLDX:'PIMCO StocksPLUS'};
 var BC={Strategy:'#B0215B',SPY:'#5A6B85',QQQ:'#0E7C8A',SPMO:'#A85B24',
-        XLG:'#5B4B8A',MAGS:'#3F7A5B',RSP:'#8A6D1F'};
+        XLG:'#5B4B8A',MAGS:'#3F7A5B',RSP:'#8A6D1F',
+        SMH:'#A3312A',VGT:'#1F5FA8',TOPT:'#8E3A6B',PSLDX:'#4F6D2E'};
 var D=null,N=0,LAST='',R=null;
 var state={period:'MAX',from:'',to:'',initial:100000,dca:0,freq:'none',
-           rf:0.02,ref:'SPY',show:{SPY:1,QQQ:1,SPMO:0,XLG:0,MAGS:0,RSP:0},log:true};
+           rf:0.02,ref:'SPY',show:{SPY:1,QQQ:1,SPMO:0,XLG:0,MAGS:0,RSP:0,SMH:0,VGT:0,TOPT:0,PSLDX:0},log:true};
 
 function money(v){return v===null||!isFinite(v)?'\u2014':(v<0?'\u2212$':'$')+Math.round(Math.abs(v)).toLocaleString('en-US')}
 function pc(v,d){return v===null||v===undefined||!isFinite(v)?'\u2014':(v>=0?'+':'\u2212')+(Math.abs(v)*100).toFixed(d===undefined?1:d)+'%'}
@@ -749,6 +751,11 @@ fetch('portfolio.json?v='+Date.now()).then(function(r){
   LOADED=true;
   D=j;N=D.dates.length-1;LAST=D.dates[N];
   Object.keys(state.show).forEach(function(k){if(!D.series[k])delete state.show[k]});
+  // anything published but not configured still gets shown, just unnamed
+  Object.keys(D.series).forEach(function(k){
+    if(k==='Strategy'||state.show[k]!==undefined)return;
+    state.show[k]=0; if(!BN[k])BN[k]=k; if(!BC[k])BC[k]='#6A7382';
+  });
   if(!D.series[state.ref])state.ref=Object.keys(state.show)[0];
   document.body.classList.remove('loading');
   document.body.classList.toggle('mob',MOB);
