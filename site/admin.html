@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Roster Admin — Survival of the Fittest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Inter+Tight:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#E6EAF1;--surface:#fff;--ink:#0A111F;--ink2:#1C2637;--muted:#465266;--faint:#68758A;
+ --rule:#C2CAD8;--soft:#D6DCE6;--accent:#A81B55;--accent-soft:#F7DFE9;--gain:#14663C;--loss:#A31B14;
+ --warn:#8A5A00;--warn-soft:#FBF0D8;
+ --shadow:0 1px 2px rgba(10,17,31,.07),0 10px 28px -14px rgba(10,17,31,.20);
+ --disp:"Bricolage Grotesque","Inter Tight",system-ui,sans-serif;
+ --body:"Inter Tight",system-ui,-apple-system,sans-serif;
+ --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+@media(max-width:700px){.wrap{padding:0 13px}}
+header{background:var(--surface);border-bottom:2px solid var(--rule);padding:26px 0 22px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0 0 9px}
+h1{font-family:var(--disp);font-weight:800;font-size:clamp(26px,4.4vw,38px);letter-spacing:-.035em;margin:0 0 8px}
+.dek{margin:0;color:var(--ink2);max-width:72ch;font-size:14.5px}
+section{padding:26px 0 4px}
+h2{font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:-.02em;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.card{background:var(--surface);border:1.5px solid var(--rule);border-radius:3px;box-shadow:var(--shadow);padding:18px}
+label.fl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+input,select{font-family:var(--mono);font-size:14px;font-weight:600;padding:10px 11px;border:1.5px solid var(--rule);border-radius:3px;background:var(--surface);color:var(--ink);width:100%}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:700px){.g3,.g2{grid-template-columns:1fr}}
+button{font-family:var(--mono);font-size:13px;font-weight:700;padding:11px 18px;border-radius:3px;cursor:pointer;border:1.5px solid var(--rule);background:var(--surface);color:var(--ink);letter-spacing:.03em;transition:.12s}
+button:hover:not(:disabled){border-color:var(--ink)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+button.pri:hover:not(:disabled){background:#8E1546;border-color:#8E1546}
+button.sm{padding:7px 12px;font-size:12px}
+button.danger{color:var(--loss);border-color:#E3B6B3}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.msg{padding:12px 14px;border-radius:3px;font-size:13.5px;margin-top:14px;line-height:1.6}
+.msg.ok{background:#E3F2E9;border-left:3px solid var(--gain);color:#0D4A2B}
+.msg.err{background:#FBE6E4;border-left:3px solid var(--loss);color:#7A140F}
+.msg.warn{background:var(--warn-soft);border-left:3px solid var(--warn);color:#6B4600}
+.msg.info{background:var(--accent-soft);border-left:3px solid var(--accent);color:var(--ink2)}
+.msg b{display:block;margin-bottom:4px}
+.msg ul{margin:6px 0 0;padding-left:18px}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:700;padding:10px 9px;border-bottom:2px solid var(--rule);white-space:nowrap}
+td{padding:9px;border-bottom:1px solid var(--soft);vertical-align:top}
+tbody tr:hover{background:#EDF0F5}
+tr.sel{background:var(--accent-soft)!important}
+.names{font-size:11.5px;color:var(--muted);line-height:1.6;word-break:break-word}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;border-radius:2px;margin-left:6px}
+.badge.bad{background:#FBE6E4;color:var(--loss)}
+.badge.new{background:var(--accent);color:#fff}
+.scroll{overflow-x:auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.tk{font-family:var(--mono);font-size:12px;font-weight:600;padding:8px 11px;border:1.5px solid var(--rule);border-radius:3px;background:var(--surface);color:var(--muted);cursor:pointer;user-select:none}
+.tk:hover{border-color:var(--faint);color:var(--ink)}
+.tk.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.wsum{font-family:var(--mono);font-size:15px;font-weight:700}
+.hide{display:none}
+code{font-family:var(--mono);font-size:12.5px;background:#EDF0F5;padding:2px 5px;border-radius:2px}
+.note{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px;line-height:1.65}
+footer{border-top:2px solid var(--rule);margin-top:40px;padding:22px 0 40px;color:var(--muted);font-family:var(--mono);font-size:11px;line-height:1.8}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--rule);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:7px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <p class="eyebrow">Roster admin</p>
+  <h1>Survival of the Fittest</h1>
+  <p class="dek">Add, edit or remove holding periods without touching code. Changes are written straight to <code>roster.json</code> in your repository and the site rebuilds itself.</p>
+</div></header>
+
+<main class="wrap">
+
+<section>
+  <h2>1 &middot; Connect</h2>
+  <p class="sub">A fine-grained GitHub token with <b>Contents: read and write</b> on this repository only. It is stored in this browser and never sent anywhere except github.com.</p>
+  <div class="card">
+    <div class="grid g3">
+      <div><label class="fl">Owner</label><input id="owner" placeholder="shivgarggit"></div>
+      <div><label class="fl">Repository</label><input id="repo" placeholder="survival-of-the-fittest"></div>
+      <div><label class="fl">Branch</label><input id="branch" value="main"></div>
+    </div>
+    <div style="height:14px"></div>
+    <label class="fl">GitHub token</label>
+    <input id="token" type="password" placeholder="github_pat_...">
+    <div class="row" style="margin-top:8px">
+      <label style="font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px;cursor:pointer">
+        <input type="checkbox" id="remember" style="width:auto" checked> Remember on this device
+      </label>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="pri" id="load">Load roster</button>
+      <button id="forget" class="danger sm">Forget token</button>
+    </div>
+    <div id="connMsg"></div>
+    <p class="note">Create one at github.com &rarr; Settings &rarr; Developer settings &rarr; Personal access tokens &rarr; Fine-grained tokens. Limit it to this single repository and grant only Contents write. Anyone with the token can write to the repo, so do not paste it on a shared computer.</p>
+  </div>
+</section>
+
+<section id="editor" class="hide">
+  <h2>2 &middot; Holding periods</h2>
+  <p class="sub">Click any row to edit it. Periods may not overlap, and weights must total 100%.</p>
+  <div class="card">
+    <div class="row" style="margin-bottom:14px">
+      <button class="pri sm" id="addQ">Add period</button>
+      <button class="sm" id="dupLast">Duplicate last</button>
+      <span style="flex:1"></span>
+      <span class="note" style="margin:0" id="count"></span>
+    </div>
+    <div id="issues"></div>
+    <div class="scroll"><table id="qtable"></table></div>
+  </div>
+</section>
+
+<section id="formSec" class="hide">
+  <h2 id="formTitle">Edit period</h2>
+  <p class="sub">Tap a ticker to add or remove it. Equal weight is applied automatically unless you set weights by hand.</p>
+  <div class="card">
+    <div class="grid g3">
+      <div><label class="fl">Label</label><input id="fq" placeholder="Q1 2027"></div>
+      <div><label class="fl">Start date</label><input id="fs" type="date"></div>
+      <div><label class="fl">End date</label><input id="fe" type="date"></div>
+    </div>
+    <div style="height:18px"></div>
+    <label class="fl">Holdings <span id="nsel" style="color:var(--ink);font-weight:700"></span></label>
+    <div class="chips" id="tickChips"></div>
+    <div class="row" style="margin-top:12px">
+      <input id="newTick" placeholder="Add a ticker (Tiingo spelling)" style="max-width:280px">
+      <button class="sm" id="addTick">Add</button>
+      <span style="flex:1"></span>
+      <span class="wsum" id="wsum"></span>
+    </div>
+    <div id="wrows" style="margin-top:14px"></div>
+    <div class="row" style="margin-top:18px">
+      <button class="pri" id="apply">Apply to list</button>
+      <button id="cancel">Cancel</button>
+      <span style="flex:1"></span>
+      <button class="danger" id="del">Delete this period</button>
+    </div>
+    <div id="formMsg"></div>
+  </div>
+</section>
+
+<section id="saveSec" class="hide">
+  <h2>3 &middot; Publish</h2>
+  <p class="sub">Writes <code>roster.json</code> to the repository and starts the rebuild. Takes three to six minutes.</p>
+  <div class="card">
+    <div id="diff"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="pri" id="save">Save and rebuild</button>
+      <button id="saveOnly">Save without rebuilding</button>
+      <button id="reload">Discard my changes</button>
+    </div>
+    <div id="saveMsg"></div>
+    <p class="note">Save without rebuilding if you want to make several edits first. The nightly run will pick them up regardless.</p>
+  </div>
+</section>
+
+</main>
+
+<footer><div class="wrap">
+  Writes to roster.json only. Prices, dividends and everything else are fetched by the scheduled job.<br>
+  Changes are ordinary git commits, so every edit is reversible from the repository history.
+</div></footer>
+
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+var API='https://api.github.com';
+var orig=null, data=null, sha=null, editIdx=-1, draft=null;
+
+function el(id){return document.getElementById(id)}
+function msg(host,kind,html){ $(host).innerHTML='<div class="msg '+kind+'">'+html+'</div>' }
+function clear(host){ $(host).innerHTML='' }
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+/* ---- guess the repo from the Pages URL ---- */
+(function(){
+  var h=location.hostname, p=location.pathname.split('/').filter(Boolean);
+  if(/\.github\.io$/.test(h)){
+    el('owner').value=localStorage.getItem('sof_owner')||h.replace('.github.io','');
+    el('repo').value=localStorage.getItem('sof_repo')||(p[0]||'');
+  }else{
+    el('owner').value=localStorage.getItem('sof_owner')||'';
+    el('repo').value=localStorage.getItem('sof_repo')||'';
+  }
+  el('branch').value=localStorage.getItem('sof_branch')||'main';
+  var t=localStorage.getItem('sof_tok'); if(t)el('token').value=t;
+})();
+
+function cfg(){return {owner:el('owner').value.trim(),repo:el('repo').value.trim(),
+                       branch:el('branch').value.trim()||'main',tok:el('token').value.trim()}}
+
+function gh(path,opts){
+  var c=cfg(); opts=opts||{};
+  opts.headers=Object.assign({'Accept':'application/vnd.github+json',
+    'Authorization':'Bearer '+c.tok,'X-GitHub-Api-Version':'2022-11-28'},opts.headers||{});
+  return fetch(API+path,opts).then(function(r){
+    if(r.status===204)return {};
+    return r.json().then(function(j){
+      if(!r.ok){var m=j.message||('HTTP '+r.status);
+        if(r.status===401)m='Token rejected. Check it has not expired.';
+        if(r.status===404)m='Not found. Check owner, repository and that the token covers this repo.';
+        throw new Error(m)}
+      return j})});
+}
+function b64enc(s){return btoa(unescape(encodeURIComponent(s)))}
+function b64dec(s){return decodeURIComponent(escape(atob(s.replace(/\n/g,''))))}
+
+/* ---------- load ---------- */
+$('#load').addEventListener('click',function(){
+  var c=cfg();
+  if(!c.owner||!c.repo||!c.tok){msg('#connMsg','err','Fill in owner, repository and token.');return}
+  localStorage.setItem('sof_owner',c.owner);localStorage.setItem('sof_repo',c.repo);
+  localStorage.setItem('sof_branch',c.branch);
+  if(el('remember').checked)localStorage.setItem('sof_tok',c.tok); else localStorage.removeItem('sof_tok');
+  msg('#connMsg','info','<span class="spin"></span>Loading roster.json');
+  gh('/repos/'+c.owner+'/'+c.repo+'/contents/roster.json?ref='+encodeURIComponent(c.branch))
+    .then(function(j){
+      sha=j.sha; data=JSON.parse(b64dec(j.content)); orig=JSON.stringify(data);
+      if(!data.quarters)throw new Error('roster.json has no "quarters" array.');
+      msg('#connMsg','ok','Loaded <b style="display:inline">'+data.quarters.length+' holding periods</b> from '+esc(c.owner)+'/'+esc(c.repo)+'.');
+      $('#editor').classList.remove('hide'); $('#saveSec').classList.remove('hide');
+      render();
+    }).catch(function(e){ msg('#connMsg','err','<b>Could not load</b>'+esc(e.message)) });
+});
+$('#forget').addEventListener('click',function(){
+  localStorage.removeItem('sof_tok'); el('token').value='';
+  msg('#connMsg','info','Token removed from this browser.');
+});
+
+/* ---------- validation ---------- */
+function problems(){
+  var out=[],seen={};
+  data.quarters.forEach(function(q){
+    if(seen[q.q])out.push('Duplicate label: '+q.q); seen[q.q]=1;
+    if(!q.start||!q.end)out.push(q.q+': missing a date');
+    else if(q.start>q.end)out.push(q.q+': start is after end');
+    var n=Object.keys(q.weights||{}).length;
+    if(!n)out.push(q.q+': no holdings');
+    var t=Object.keys(q.weights||{}).reduce(function(a,k){return a+ +q.weights[k]},0);
+    if(n&&Math.abs(t-1)>0.005)out.push(q.q+': weights total '+(t*100).toFixed(2)+'%, not 100%');
+  });
+  var ord=data.quarters.slice().sort(function(a,b){return a.start<b.start?-1:1});
+  for(var i=1;i<ord.length;i++)
+    if(ord[i].start<=ord[i-1].end)
+      out.push(ord[i-1].q+' and '+ord[i].q+' overlap ('+ord[i-1].end+' / '+ord[i].start+')');
+  return out;
+}
+function qbad(q){
+  var n=Object.keys(q.weights||{}).length;
+  var t=Object.keys(q.weights||{}).reduce(function(a,k){return a+ +q.weights[k]},0);
+  return !n||!q.start||!q.end||q.start>q.end||Math.abs(t-1)>0.005;
+}
+
+/* ---------- list ---------- */
+function render(){
+  data.quarters.sort(function(a,b){return a.start<b.start?-1:(a.start>b.start?1:0)});
+  var h='<thead><tr><th>Period</th><th>Start</th><th>End</th><th>Names</th><th>Weight each</th><th>Holdings</th></tr></thead><tbody>';
+  data.quarters.forEach(function(q,i){
+    var ks=Object.keys(q.weights||{}).sort();
+    var eq=ks.length?(q.weights[ks[0]]*100).toFixed(2)+'%':'—';
+    var same=ks.every(function(k){return Math.abs(q.weights[k]-q.weights[ks[0]])<1e-9});
+    h+='<tr data-i="'+i+'"><td><b>'+esc(q.q)+'</b>'+(qbad(q)?'<span class="badge bad">check</span>':'')+'</td>'+
+       '<td>'+esc(q.start)+'</td><td>'+esc(q.end)+'</td><td>'+ks.length+'</td>'+
+       '<td>'+(same?eq:'<i>mixed</i>')+'</td>'+
+       '<td class="names">'+esc(ks.join(', '))+'</td></tr>';
+  });
+  $('#qtable').innerHTML=h+'</tbody>';
+  [].forEach.call(document.querySelectorAll('#qtable tbody tr'),function(tr){
+    tr.addEventListener('click',function(){openForm(+tr.dataset.i)})});
+  $('#count').textContent=data.quarters.length+' periods · '+
+    data.quarters[0].start+' to '+data.quarters[data.quarters.length-1].end;
+  var p=problems();
+  if(p.length)msg('#issues','err','<b>'+p.length+' problem'+(p.length>1?'s':'')+' to fix before publishing</b><ul><li>'+
+    p.map(esc).join('</li><li>')+'</li></ul>');
+  else clear('#issues');
+  renderDiff();
+}
+function renderDiff(){
+  var changed=JSON.stringify(data)!==orig;
+  if(!changed){msg('#diff','info','No unsaved changes.');$('#save').disabled=true;$('#saveOnly').disabled=true;return}
+  var o=JSON.parse(orig), om={},nm={};
+  o.quarters.forEach(function(q){om[q.q]=JSON.stringify(q)});
+  data.quarters.forEach(function(q){nm[q.q]=JSON.stringify(q)});
+  var add=[],rem=[],mod=[];
+  Object.keys(nm).forEach(function(k){ if(!om[k])add.push(k); else if(om[k]!==nm[k])mod.push(k) });
+  Object.keys(om).forEach(function(k){ if(!nm[k])rem.push(k) });
+  var parts=[];
+  if(add.length)parts.push('<li>Added: <b style="display:inline">'+add.map(esc).join(', ')+'</b></li>');
+  if(mod.length)parts.push('<li>Changed: <b style="display:inline">'+mod.map(esc).join(', ')+'</b></li>');
+  if(rem.length)parts.push('<li>Removed: <b style="display:inline">'+rem.map(esc).join(', ')+'</b></li>');
+  msg('#diff','warn','<b>Unsaved changes</b><ul>'+parts.join('')+'</ul>');
+  var ok=problems().length===0;
+  $('#save').disabled=!ok; $('#saveOnly').disabled=!ok;
+  if(!ok)$('#diff').innerHTML+='<div class="msg err">Fix the problems above before publishing.</div>';
+}
+
+/* ---------- form ---------- */
+function universe(){
+  var u={}; (data.universe||[]).forEach(function(t){u[t]=1});
+  data.quarters.forEach(function(q){Object.keys(q.weights||{}).forEach(function(t){u[t]=1})});
+  return Object.keys(u).sort();
+}
+function openForm(i){
+  editIdx=i;
+  var q=i>=0?data.quarters[i]:{q:'',start:'',end:'',weights:{}};
+  draft=JSON.parse(JSON.stringify(q));
+  $('#formTitle').textContent=i>=0?'Edit '+q.q:'New holding period';
+  el('fq').value=draft.q; el('fs').value=draft.start; el('fe').value=draft.end;
+  $('#del').style.display=i>=0?'':'none';
+  $('#formSec').classList.remove('hide');
+  drawChips(); clear('#formMsg');
+  $('#formSec').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function drawChips(){
+  var u=universe(), sel=draft.weights||{};
+  $('#tickChips').innerHTML=u.map(function(t){
+    return '<span class="tk'+(sel[t]!==undefined?' on':'')+'" data-t="'+t+'">'+t+'</span>'}).join('');
+  [].forEach.call(document.querySelectorAll('#tickChips .tk'),function(c){
+    c.addEventListener('click',function(){
+      var t=c.dataset.t;
+      if(draft.weights[t]!==undefined)delete draft.weights[t];
+      else draft.weights[t]=0;
+      equalise(); drawChips();
+    })});
+  var ks=Object.keys(draft.weights).sort();
+  $('#nsel').textContent=ks.length?'('+ks.length+' selected)':'(none selected)';
+  var tot=ks.reduce(function(a,k){return a+ +draft.weights[k]},0);
+  $('#wsum').innerHTML='Total <span class="'+(Math.abs(tot-1)<0.005?'':'badge bad')+'">'+(tot*100).toFixed(2)+'%</span>';
+  $('#wrows').innerHTML = ks.length?
+    '<div class="grid g3">'+ks.map(function(t){
+      return '<div><label class="fl">'+t+'</label><input class="wi" data-t="'+t+'" type="number" step="0.01" value="'+
+             (draft.weights[t]*100).toFixed(2)+'"></div>'}).join('')+'</div>' : '';
+  [].forEach.call(document.querySelectorAll('.wi'),function(inp){
+    inp.addEventListener('change',function(){
+      draft.weights[inp.dataset.t]=(+inp.value||0)/100; drawChips()})});
+}
+function equalise(){
+  var ks=Object.keys(draft.weights);
+  var custom=ks.some(function(k){return draft.weights[k]>0 &&
+    Math.abs(draft.weights[k]-1/ks.length)>1e-6 && Math.abs(draft.weights[k]-0.0625)>1e-6});
+  if(!ks.length)return;
+  if(!custom||ks.some(function(k){return draft.weights[k]===0}))
+    ks.forEach(function(k){draft.weights[k]=1/ks.length});
+}
+$('#addTick').addEventListener('click',function(){
+  var t=el('newTick').value.trim().toUpperCase().replace(/\./g,'-');
+  if(!t)return;
+  draft.weights[t]=0; equalise(); el('newTick').value=''; drawChips();
+});
+el('newTick').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();$('#addTick').click()}});
+$('#apply').addEventListener('click',function(){
+  draft.q=el('fq').value.trim(); draft.start=el('fs').value; draft.end=el('fe').value;
+  if(!draft.q||!draft.start||!draft.end){msg('#formMsg','err','Label and both dates are required.');return}
+  if(!Object.keys(draft.weights).length){msg('#formMsg','err','Select at least one holding.');return}
+  if(editIdx>=0)data.quarters[editIdx]=draft; else data.quarters.push(draft);
+  $('#formSec').classList.add('hide'); render();
+});
+$('#cancel').addEventListener('click',function(){$('#formSec').classList.add('hide')});
+$('#del').addEventListener('click',function(){
+  if(editIdx<0)return;
+  if(!confirm('Delete '+data.quarters[editIdx].q+'?'))return;
+  data.quarters.splice(editIdx,1); $('#formSec').classList.add('hide'); render();
+});
+$('#addQ').addEventListener('click',function(){openForm(-1)});
+$('#dupLast').addEventListener('click',function(){
+  var last=data.quarters[data.quarters.length-1];
+  openForm(-1);
+  draft.weights=JSON.parse(JSON.stringify(last.weights));
+  el('fq').value=''; drawChips();
+});
+
+/* ---------- save ---------- */
+function commit(thenRun){
+  var c=cfg();
+  if(problems().length){msg('#saveMsg','err','Fix the listed problems first.');return}
+  data.quarters.sort(function(a,b){return a.start<b.start?-1:1});
+  msg('#saveMsg','info','<span class="spin"></span>Writing roster.json');
+  gh('/repos/'+c.owner+'/'+c.repo+'/contents/roster.json',{
+    method:'PUT',
+    body:JSON.stringify({
+      message:'Roster update via admin ('+data.quarters.length+' periods)',
+      content:b64enc(JSON.stringify(data,null,1)), sha:sha, branch:c.branch })
+  }).then(function(j){
+    sha=j.content.sha; orig=JSON.stringify(data);
+    if(!thenRun){msg('#saveMsg','ok','<b>Saved</b>roster.json updated. Run the workflow when you are ready.');render();return}
+    msg('#saveMsg','info','<span class="spin"></span>Saved. Starting the rebuild');
+    return gh('/repos/'+c.owner+'/'+c.repo+'/actions/workflows/update.yml/dispatches',{
+      method:'POST', body:JSON.stringify({ref:c.branch})
+    }).then(function(){
+      msg('#saveMsg','ok','<b>Saved and rebuilding</b>Three to six minutes. '+
+        'Watch it at <a href="https://github.com/'+esc(c.owner)+'/'+esc(c.repo)+'/actions" target="_blank" rel="noopener">the Actions tab</a>.');
+      render();
+    }).catch(function(e){
+      msg('#saveMsg','warn','<b>Saved, but could not start the rebuild</b>'+esc(e.message)+
+        '<br>The roster is committed. Start it by hand from the Actions tab, or wait for the nightly run.');
+      render();
+    });
+  }).catch(function(e){
+    var m=esc(e.message);
+    if(/sha/i.test(e.message))m+='<br>Someone else changed roster.json since you loaded it. Reload and redo your edit.';
+    msg('#saveMsg','err','<b>Could not save</b>'+m);
+  });
+}
+$('#save').addEventListener('click',function(){commit(true)});
+$('#saveOnly').addEventListener('click',function(){commit(false)});
+$('#reload').addEventListener('click',function(){
+  if(!confirm('Discard your unsaved changes?'))return;
+  data=JSON.parse(orig); $('#formSec').classList.add('hide'); render();
+});
+window.addEventListener('beforeunload',function(e){
+  if(data&&JSON.stringify(data)!==orig){e.preventDefault();e.returnValue=''}
+});
+})();
+</script>
+</body>
+</html>
