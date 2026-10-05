@@ -71,6 +71,42 @@ def fetch(ticker, token, start, end):
     return None, ticker
 
 
+def read_roster_json(path):
+    """Preferred source. Human-editable, browser-editable, diffable in git."""
+    d = json.loads(Path(path).read_text())
+    out = []
+    for q in d.get("quarters", []):
+        w = {TICKER_FIX.get(k, k): float(v) for k, v in q.get("weights", {}).items() if float(v) > 0}
+        if not w:
+            continue
+        out.append(dict(q=str(q["q"]).strip(), start=str(q["start"])[:10],
+                        end=str(q["end"])[:10], w=w))
+    return out
+
+
+def validate(quarters):
+    """Catch roster mistakes here rather than discovering them in the output."""
+    errs, warns = [], []
+    seen = set()
+    for q in quarters:
+        if q["q"] in seen:
+            errs.append("duplicate quarter label: %s" % q["q"])
+        seen.add(q["q"])
+        if q["start"] > q["end"]:
+            errs.append("%s: start %s is after end %s" % (q["q"], q["start"], q["end"]))
+        tot = sum(q["w"].values())
+        if abs(tot - 1.0) > 0.005:
+            errs.append("%s: weights sum to %.4f, not 1" % (q["q"], tot))
+        elif abs(tot - 1.0) > 1e-6:
+            warns.append("%s: weights sum to %.6f" % (q["q"], tot))
+    order = sorted(quarters, key=lambda x: x["start"])
+    for a, b in zip(order, order[1:]):
+        if b["start"] <= a["end"]:
+            errs.append("%s (%s-%s) overlaps %s (%s-%s)"
+                        % (a["q"], a["start"], a["end"], b["q"], b["start"], b["end"]))
+    return errs, warns
+
+
 def read_weights(path):
     wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
     rows = list(wb["Weightage"].iter_rows(values_only=True))
@@ -94,7 +130,8 @@ def read_weights(path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--workbook", required=True)
+    ap.add_argument("--workbook", default="weights.xlsx")
+    ap.add_argument("--roster", default="roster.json")
     ap.add_argument("--json", default="engine_data.json")
     ap.add_argument("--token", default=os.environ.get("TIINGO_TOKEN", ""))
     a = ap.parse_args()
@@ -102,9 +139,24 @@ def main():
     if not a.token:
         sys.exit("No token. Set the TIINGO_TOKEN environment variable or pass --token.")
 
-    quarters = read_weights(a.workbook)
+    if a.roster and Path(a.roster).exists():
+        quarters = read_roster_json(a.roster)
+        print("Roster source: %s" % a.roster)
+    else:
+        quarters = read_weights(a.workbook)
+        print("Roster source: %s (Weightage sheet)" % a.workbook)
     if not quarters:
-        sys.exit("No quarters found in the Weightage sheet of %s" % a.workbook)
+        sys.exit("No quarters found in the roster.")
+
+    errs, warns = validate(quarters)
+    for w in warns:
+        print("  WARN  %s" % w)
+    if errs:
+        print("\nROSTER ERRORS - fix these in admin.html or roster.json:")
+        for e in errs:
+            print("  %s" % e)
+        sys.exit("Stopping rather than building from a broken roster.")
+    quarters.sort(key=lambda x: x["start"])
     comps = sorted({t for q in quarters for t in q["w"]})
     start = min(q["start"] for q in quarters)
     end = max(q["end"] for q in quarters)
