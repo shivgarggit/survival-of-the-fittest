@@ -21,6 +21,7 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'roster.json'
       - '.github/workflows/**'
 
 permissions:
@@ -37,11 +38,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Decide whether to refresh data
         id: mode
         run: |
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.skip_data }}" = "true" ]; then
+          # A roster change needs real data; a site-only change does not.
+          ROSTER_CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -c '^roster.json$' || true)
+          if [ "${{ inputs.skip_data }}" = "true" ]; then
+            echo "refresh=no" >> $GITHUB_OUTPUT
+            echo "Publish-only run requested."
+          elif [ "${{ github.event_name }}" = "push" ] && [ "$ROSTER_CHANGED" = "0" ]; then
             echo "refresh=no" >> $GITHUB_OUTPUT
             echo "Publish-only run - the data provider will not be contacted."
           else
@@ -67,7 +75,8 @@ jobs:
         env:
           TIINGO_TOKEN: ${{ secrets.TIINGO_TOKEN }}
         run: |
-          for f in weights.xlsx refresh_data.py build_site.py; do
+          if [ -f roster.json ]; then echo "OK      roster.json (roster source)"; else echo "WARN    roster.json absent, falling back to weights.xlsx"; fi
+          for f in refresh_data.py build_site.py; do
             if [ -f "$f" ]; then echo "OK      $f"; else echo "MISSING $f"; fi
           done
           if grep -q "api.tiingo.com" refresh_data.py 2>/dev/null; then
@@ -92,7 +101,7 @@ jobs:
         continue-on-error: true
         env:
           TIINGO_TOKEN: ${{ secrets.TIINGO_TOKEN }}
-        run: python refresh_data.py --workbook weights.xlsx --json engine_data.json
+        run: python refresh_data.py --roster roster.json --workbook weights.xlsx --json engine_data.json
 
       - name: Build published payload
         id: payload
